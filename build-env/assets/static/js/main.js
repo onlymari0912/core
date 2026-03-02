@@ -57,11 +57,12 @@
     });
   });
 
-  var audioElement;
+  // 이딴게 있을 이유가 도대체 뭐지
+  /*var audioElement;
   $(document).ready(() => {
     audioElement = document.createElement('audio');
     audioElement.setAttribute('src', '/static/seeya.mp3');
-    audioElement.volume = 0.3;
+    audioElement.volume = 0.2;
   });
 
   $('#shutdown').on('click', () => {
@@ -70,7 +71,7 @@
     audioElement.play();
     window.scrollTo(0, 0);
     axios.get('/fun/shutdown');
-  });
+  });*/
 
   $('#logout').on('click', () => {
     location.href = '/logout';
@@ -115,10 +116,10 @@
   $('.data-delete').on('click', e => {
     axios
       .delete(`/upload/${encodeURIComponent(e.currentTarget.getAttribute('deleting'))}`)
-      .then(response => {
+      .then(() => {
         window.location.reload(true);
       })
-      .catch(error => {
+      .catch(() => {
         window.location.reload(true);
       });
   });
