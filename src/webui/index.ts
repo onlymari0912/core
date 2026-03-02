@@ -625,9 +625,9 @@ webui.get(
 
 // General setting update
 webui.post(
-  '*',
-  urlencoded({ extended: true, limit: '50mb' }),
-  wrap(async (req, res) => {
+    '*',
+    urlencoded({ extended: true, limit: '50mb' }),
+    wrap(async (req, res) => {
         const page = (req.query as any).page;
 
     if (isEmpty(req.body)) {
