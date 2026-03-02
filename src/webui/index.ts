@@ -270,6 +270,7 @@ webui.post(
 
       if (!(await FindCard(cid))) {
         await CreateCard(cid, refid, print);
+        return res.sendStatus(200);
       }
     } catch {}
 
@@ -283,10 +284,11 @@ webui.post(
       const cid = card2nfc(print);
       if (cardType(cid) >= 0 && !(await FindCard(cid))) {
         await CreateCard(cid, refid, print);
+        return res.sendStatus(200);
       }
     } catch {}
-
-    res.sendStatus(200);
+    req.flash('formWarn', '카드 추가 실패');
+    res.sendStatus(403);
   })
 );
 
@@ -566,13 +568,7 @@ webui.get(
     }
 
     const pageName = req.query['page'];
-
-    let page = null;
-    if (pageName == null) {
-      page = plugin.FirstProfilePage;
-    } else {
-      page = `profile_${pageName.toString()}`;
-    }
+    const page = pageName == null ? plugin.FirstProfilePage : `profile_${pageName.toString()}`;
 
     const content = await plugin.render(page, { query: req.query }, refid.toString());
     if (content == null) {
@@ -632,7 +628,7 @@ webui.post(
   '*',
   urlencoded({ extended: true, limit: '50mb' }),
   wrap(async (req, res) => {
-    const page = req.query.page;
+        const page = (req.query as any).page;
 
     if (isEmpty(req.body)) {
       res.sendStatus(400);
