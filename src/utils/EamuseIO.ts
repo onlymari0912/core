@@ -343,8 +343,7 @@ export async function FindCardsByRefid(refid: string) {
 }
 
 export async function CreateCard(cid: string, refid: string, forcePrint?: string) {
-  let print = '<Invalid Card>';
-
+  let print: string;
   if (forcePrint) {
     print = forcePrint;
   } else {
