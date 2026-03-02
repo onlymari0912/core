@@ -1,0 +1,39 @@
+doctype html
+html
+  head
+    meta(charset="utf-8")
+    meta(http-equiv="X-UA-Compatible", content="ie=edge")
+    meta(name="viewport", content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0")
+    title Asphyxia CORE - Login
+    link(rel="stylesheet", href="/static/css/bulma.min.css")
+    link(rel="stylesheet", href="/static/css/materialdesignicons.min.css")
+    link(rel="stylesheet", href="/static/css/style.css")
+  body
+    section.section
+      .columns.is-centered
+        .column.is-5
+          .card
+            header.card-header
+              p.card-header-title
+                span.icon
+                  i.mdi.mdi-lock
+                | Asphyxia Login
+            .card-content
+              form(method="post" action="/login")
+                input(type="hidden" name="next" value=next)
+                .field
+                  label.label(for="username") Username
+                  .control
+                    input.input(type="text" name="username" id="username" autocomplete="username" required)
+                .field
+                  label.label(for="password") Password
+                  .control
+                    input.input(type="password" name="password" id="password" autocomplete="current-password" required)
+                if formMessage
+                  if formMessage.danger
+                    .notification.is-danger.is-light #{formMessage.message}
+                  else
+                    .notification.is-success.is-light #{formMessage.message}
+                .field.is-grouped.is-grouped-right
+                  .control
+                    button.button.is-link(type="submit") Login

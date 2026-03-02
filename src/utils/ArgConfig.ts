@@ -67,7 +67,7 @@ export const ARGS = parser.parseArgs();
 export interface CONFIG_OPTIONS {
   name?: string;
   desc?: string;
-  type: 'string' | 'integer' | 'float' | 'boolean';
+  type: 'string' | 'integer' | 'float' | 'boolean' | 'password';
   range?: [number, number];
   validator?: (data: string) => true | string;
   options?: string[];
@@ -127,6 +127,19 @@ function CoreConfig() {
   CONFIG_MAP['core'].set('enable_paseli', {
     type: 'boolean',
     default: true,
+  });
+
+  CONFIG_MAP['core'].set('webui_username', {
+    name: 'WebUI Username',
+    type: 'string',
+    default: 'admin',
+    desc: 'Admin username used with WebUI Password.',
+  });
+  CONFIG_MAP['core'].set('webui_password', {
+    name: 'WebUI Password',
+    type: 'password',
+    default: 'Qwer1234',
+    desc: 'Set a password to protect the WebUI.',
   });
 
   if (process.platform == 'win32') {

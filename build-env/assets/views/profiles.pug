@@ -35,9 +35,10 @@ block content
                         a.button.is-primary(href=`/profile/${profile.__refid}` data-tooltip="Edit")
                           span.icon
                             i.mdi.mdi-account-edit.mdi-18px
-                        a.button.is-danger.jb-modal.data-delete-button(data-target="confirm-modal" deleting=profile.__refid deleting-name=profile.name data-tooltip="Delete")
-                          span.icon
-                            i.mdi.mdi-trash-can.mdi-18px
+                        if admin
+                          a.button.is-danger.jb-modal.data-delete-button(data-target="confirm-modal" deleting=profile.__refid deleting-name=profile.name data-tooltip="Delete")
+                            span.icon
+                              i.mdi.mdi-trash-can.mdi-18px
         else
           section.section
             .content.has-text-grey.has-text-centered

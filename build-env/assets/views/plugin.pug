@@ -47,5 +47,5 @@ block content
                   span.tag.is-primary #{code}
         if datafile.length
           +files("Data Upload", datafile)
-        if config.length
+        if config.length && admin
           +form("Plugin Settings", config)

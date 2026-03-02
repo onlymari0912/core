@@ -25,6 +25,7 @@ import {
   FindCardsByRefid,
   Count,
   FindProfile,
+  FindProfileByUsername,
   PurgeProfile,
   UpdateProfile,
   CreateCard,
@@ -49,6 +50,7 @@ import { groupBy, startCase, lowerCase, upperFirst } from 'lodash';
 import { sizeof } from 'sizeof';
 import { ajax as emit } from './emit';
 import { Logger } from '../utils/Logger';
+import { hashPassword, isBcryptHash, verifyPassword } from '../utils/Auth';
 
 const memorystore = createMemoryStore(session);
 
@@ -66,6 +68,110 @@ webui.use(cookies());
 
 webui.use(flash());
 let wrap = (fn: RequestHandler) => (...args: any[]) => (fn as any)(...args).catch(args[2]);
+
+function normalizeUsername(value: any) {
+  return typeof value == 'string' ? value.trim() : '';
+}
+
+function getSessionUser(req: Request) {
+  return (req as any).session?.webui_user;
+}
+
+function isAdminSession(req: Request) {
+  return getSessionUser(req)?.admin === true;
+}
+
+function getSessionRefid(req: Request) {
+  return getSessionUser(req)?.refid as string | undefined;
+}
+
+function hasProfileAccess(req: Request, refid: string) {
+  if (isAdminSession(req)) {
+    return true;
+  }
+  const sessionRefid = getSessionRefid(req);
+  return typeof sessionRefid == 'string' && sessionRefid.length > 0 && sessionRefid === refid;
+}
+
+webui.get(
+  '/login',
+  wrap(async (req, res) => {
+    const nextUrl =
+      typeof req.query.next == 'string' && req.query.next.startsWith('/') ? req.query.next : '/';
+    res.render('login', data(req, 'Login', 'core', { next: nextUrl }));
+  })
+);
+
+webui.post(
+    '/login',
+    urlencoded({ extended: true, limit: '1kb' }),
+    wrap(async (req, res) => {
+        const username = normalizeUsername(req.body?.username);
+        const password = (req.body?.password ?? '').toString();
+        if(username.length > 0){
+            let profile
+            if(username === CONFIG.webui_username){
+                profile = {username, password: CONFIG.webui_password};
+            }else{
+                profile = await FindProfileByUsername(username);
+            }
+
+            if(profile && typeof profile.password === 'string'){
+                const ok = await verifyPassword(password, profile.password);
+                if(ok){
+                    (req as any).session.webui_authed = true;
+                    let webui_user: Record<string, string | boolean>;
+                    if(typeof profile.__refid === 'string'){
+                        webui_user = { username, refid: profile.__refid, admin: false };
+                    }else{
+                        webui_user = { username, admin: true };
+                    }
+                    (req as any).session.webui_user = webui_user;
+                    if(!webui_user.admin && !isBcryptHash(profile.password)){
+                        const hashed = await hashPassword(password);
+                        await UpdateProfile(profile.__refid, { password: hashed });
+                    }
+                    const nextUrl =
+                        typeof req.body.next == 'string' && req.body.next.startsWith('/')
+                            ? req.body.next : '/';
+                    return res.redirect(nextUrl);
+                }
+            }
+        }
+        req.flash('formWarn', 'Invalid username or password');
+        res.redirect('/login');
+    }),
+);
+
+webui.get(
+    '/logout',
+    wrap(async (req, res) => {
+        if((req as any).session){
+            (req as any).session.webui_authed = false;
+            (req as any).session.webui_user = null;
+        }
+        return res.redirect('/login');
+    }),
+);
+
+webui.use(
+  wrap(async (req, res, next) => {
+    if (req.path == '/login' || req.path == '/logout') {
+      return next();
+    }
+    if ((req as any).session?.webui_authed) {
+      return next();
+    }
+
+    const accept = req.headers['accept'] || '';
+    const wantsHtml = typeof accept == 'string' && accept.includes('text/html');
+    if (wantsHtml) {
+      const nextUrl = encodeURIComponent(req.originalUrl || '/');
+      return res.redirect(`/login?next=${nextUrl}`);
+    }
+    return res.status(401).json({ error: 'Unauthorized' });
+  })
+);
 
 webui.use('/fun', fun);
 webui.use('/', emit);
@@ -93,6 +199,8 @@ function data(req: Request, title: string, plugin: string, attr?: any) {
     title,
     aside,
     plugin,
+    admin: isAdminSession(req),
+    web_profile: getSessionUser(req),
     local: req.ip == '127.0.0.1' || req.ip == '::1',
     version: VERSION,
     formMessage,
@@ -204,7 +312,17 @@ webui.get(
 webui.get(
   '/profiles',
   wrap(async (req, res) => {
-    const profiles = (await GetProfiles()) || [];
+    let profiles: any[] = [];
+    if (isAdminSession(req)) {
+      profiles = (await GetProfiles()) || [];
+    } else {
+      const refid = getSessionRefid(req);
+      if (!refid) {
+        return res.sendStatus(403);
+      }
+      const profile = await FindProfile(refid);
+      profiles = profile ? [profile] : [];
+    }
     for (const profile of profiles) {
       profile.cards = await Count({ __s: 'card', __refid: profile.__refid });
     }
@@ -216,6 +334,9 @@ webui.delete(
   '/profile/:refid',
   wrap(async (req, res) => {
     const refid = req.params['refid'];
+    if (!hasProfileAccess(req, refid)) {
+      return res.sendStatus(403);
+    }
 
     if (await PurgeProfile(refid)) {
       return res.sendStatus(200);
@@ -229,6 +350,9 @@ webui.get(
   '/profile/:refid',
   wrap(async (req, res, next) => {
     const refid = req.params['refid'];
+    if (!hasProfileAccess(req, refid)) {
+      return res.sendStatus(403);
+    }
 
     const profile = await FindProfile(refid);
     if (!profile) {
@@ -248,6 +372,13 @@ webui.delete(
   '/card/:cid',
   wrap(async (req, res) => {
     const cid = req.params['cid'];
+    if (!isAdminSession(req)) {
+      const card = await FindCard(cid);
+      const refid = getSessionRefid(req);
+      if (!card || !refid || card.__refid !== refid) {
+        return res.sendStatus(403);
+      }
+    }
 
     if (await DeleteCard(cid)) {
       return res.sendStatus(200);
@@ -262,6 +393,9 @@ webui.post(
   json({ limit: '50mb' }),
   wrap(async (req, res) => {
     const refid = req.params['refid'];
+    if (!hasProfileAccess(req, refid)) {
+      return res.sendStatus(403);
+    }
     const card = req.body.cid;
 
     try {
@@ -297,12 +431,32 @@ webui.post(
   urlencoded({ extended: true, limit: '50mb' }),
   wrap(async (req, res) => {
     const refid = req.params['refid'];
+    if (!hasProfileAccess(req, refid)) {
+      return res.sendStatus(403);
+    }
     const update: any = {};
     if (req.body.pin) {
       update.pin = req.body.pin;
     }
     if (req.body.name) {
       update.name = req.body.name;
+    }
+    if (req.body.username) {
+      const nextUsername = req.body.username.toString().trim();
+      if (nextUsername.length > 0) {
+        const existing = await FindProfileByUsername(nextUsername);
+        if (existing && existing.__refid !== refid) {
+          req.flash('formWarn', 'Username already exists');
+          return res.redirect(req.originalUrl);
+        }
+      }
+      update.username = nextUsername;
+    }
+    if (req.body.password) {
+      const nextPassword = req.body.password.toString();
+      if (nextPassword.length > 0) {
+        update.password = await hashPassword(nextPassword);
+      }
     }
 
     await UpdateProfile(refid, update);
@@ -467,6 +621,9 @@ webui.delete(
     if (!refid || refid.length < 0) {
       return res.sendStatus(400);
     }
+    if (!hasProfileAccess(req, refid)) {
+      return res.sendStatus(403);
+    }
 
     if (await APIRemove({ identifier: plugin.Identifier, core: true }, refid, {})) {
       return res.sendStatus(200);
@@ -512,10 +669,18 @@ webui.get(
       return next();
     }
 
-    const profiles = groupBy(
-      await APIFind({ identifier: plugin.Identifier, core: true }, null, {}),
-      '__refid'
-    );
+    let profileDocs: any[] = [];
+    if (isAdminSession(req)) {
+      profileDocs = await APIFind({ identifier: plugin.Identifier, core: true }, null, {});
+    } else {
+      const refid = getSessionRefid(req);
+      if (!refid) {
+        return res.sendStatus(403);
+      }
+      profileDocs = await APIFind({ identifier: plugin.Identifier, core: true }, refid, {});
+    }
+
+    const profiles = groupBy(profileDocs, '__refid');
 
     const profileData: any[] = [];
     for (const refid in profiles) {
@@ -565,6 +730,9 @@ webui.get(
 
     if (refid == null) {
       return next();
+    }
+    if (!hasProfileAccess(req, refid.toString())) {
+      return res.sendStatus(403);
     }
 
     const pageName = req.query['page'];
@@ -630,77 +798,90 @@ webui.post(
     wrap(async (req, res) => {
         const page = (req.query as any).page;
 
-    if (isEmpty(req.body)) {
-      res.sendStatus(400);
-      return;
-    }
-
-    let plugin: string = null;
-    if (req.path == '/') {
-      plugin = 'core';
-    } else if (req.path.startsWith('/plugin/')) {
-      plugin = path.basename(req.path);
-    }
-
-    if (plugin == null) {
-      res.redirect(req.originalUrl);
-      return;
-    }
-
-    if (page) {
-      // Custom page form
-    } else {
-      const configMap = CONFIG_MAP[plugin];
-      const configData = plugin == 'core' ? CONFIG : CONFIG[plugin];
-
-      if (configMap == null || configData == null) {
-        res.redirect(req.originalUrl);
-        return;
-      }
-
-      let needRestart = false;
-
-      for (const [key, config] of configMap) {
-        const current = configData[key];
-        if (config.type == 'boolean') {
-          configData[key] = req.body[key] ? true : false;
-        }
-        if (config.type == 'float') {
-          configData[key] = parseFloat(req.body[key]);
-          if (isNaN(configData[key])) {
-            configData[key] = config.default;
-          }
-        }
-        if (config.type == 'integer') {
-          configData[key] = parseInt(req.body[key]);
-          if (isNaN(configData[key])) {
-            configData[key] = config.default;
-          }
-        }
-        if (config.type == 'string') {
-          configData[key] = req.body[key];
+        if(isEmpty(req.body)){
+            res.sendStatus(400);
+            return;
         }
 
-        if (current !== configData[key]) {
-          if (!validate(config, configData[key])) {
-            if (config.needRestart) {
-              needRestart = true;
+        let plugin: string = null;
+        if(req.path == '/'){
+            plugin = 'core';
+        }else if(req.path.startsWith('/plugin/')){
+            plugin = path.basename(req.path);
+        }
+
+        if(plugin == null){
+            res.redirect(req.originalUrl);
+            return;
+        }
+
+        if(page || !isAdminSession(req)){
+            // Custom page form or not admin
+        }else{
+            const configMap = CONFIG_MAP[plugin];
+            const configData = plugin == 'core' ? CONFIG : CONFIG[plugin];
+
+            if(configMap == null || configData == null){
+                res.redirect(req.originalUrl);
+                return;
             }
-          }
+
+            let errorMessage = '';
+            let needRestart = false;
+            for(const [key, config] of configMap){
+                let newValue = req.body[key];
+                if(newValue == null) continue;
+
+                const beforeValue = configData[key];
+                if(config.type === 'boolean'){
+                    configData[key] = !!newValue;
+                }else if(config.type === 'float'){
+                    newValue = parseFloat(newValue);
+                    if(!Number.isFinite(newValue)){
+                        errorMessage = `'${key}' 옵션은 실수만 입력 가능합니다.`;
+                        break;
+                    }
+                    configData[key] = newValue;
+                }else if(config.type === 'integer'){
+                    newValue = parseInt(newValue);
+                    if(!Number.isFinite(newValue)){
+                        errorMessage = `'${key}' 옵션은 정수만 입력 가능합니다.`;
+                        break;
+                    }
+                    configData[key] = newValue;
+                }else if(config.type === 'string'){
+                    configData[key] = newValue;
+                }else if(config.type === 'password'){
+                    if(newValue.length > 3){
+                        configData[key] = await hashPassword(newValue);
+                    }else{
+                        errorMessage = `비밀번호는 최소 4자 이상이어야 합니다.`;
+                        break;
+                    }
+                }
+
+                if(beforeValue !== configData[key]){
+                    if(!validate(config, configData[key])){
+                        if(config.needRestart){
+                            needRestart = true;
+                        }
+                    }
+                }
+            }
+
+            if(errorMessage){
+                req.flash('formWarn', errorMessage);
+            }else{
+                if(needRestart){
+                    req.flash('formWarn', '수정된 항목중 일부는 재시작해야 적용됩니다.');
+                }else{
+                    req.flash('formOk', '변경 완료');
+                }
+                SaveConfig();
+            }
         }
-      }
-
-      if (needRestart) {
-        req.flash('formWarn', 'Some settings require a restart to be applied.');
-      } else {
-        req.flash('formOk', 'Updated');
-      }
-
-      SaveConfig();
-    }
-
-    res.redirect(req.originalUrl);
-  })
+        res.redirect(req.originalUrl);
+    }),
 );
 
 // 404

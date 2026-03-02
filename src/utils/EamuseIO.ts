@@ -322,6 +322,17 @@ export async function GetProfileCount() {
   return await Count({ __s: 'profile' });
 }
 
+export async function FindProfileByUsername(username: string) {
+  try {
+    return await CoreDB.findOneAsync<any>({
+      __s: 'profile',
+      username,
+    });
+  } catch (err) {
+    return false;
+  }
+}
+
 export async function FindCard(cid: string) {
   try {
     return await CoreDB.findOneAsync<any>({ __s: 'card', cid });

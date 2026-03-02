@@ -72,6 +72,10 @@
     axios.get('/fun/shutdown');
   });
 
+  $('#logout').on('click', () => {
+    location.href = '/logout';
+  });
+
   $('#open-plugins').on('click', () => {
     axios.get('/fun/open-plugins');
   });

@@ -37,6 +37,12 @@ mixin form_control(option)
               if option.error
                 span.icon.is-small.is-right.has-text-danger
                   i.mdi.mdi-alert
+        if option.type == 'password'
+          .control.is-expanded(class=option.error ? 'has-icons-right' : '' data-tooltip=option.error)
+            input.input(type='password' name=option.key value=option.current class=option.error ? 'is-danger' : '')
+            if option.error
+              span.icon.is-small.is-right.has-text-danger
+                i.mdi.mdi-alert
         if option.type == 'boolean'
           .control
             label.switch.is-rounded
@@ -56,7 +62,8 @@ mixin form(name, options)
       form(method='post')
         input(type="hidden" name="__is_plugin" value="yes")
         each option in options
-          +form_control(option)
+          if option.key != 'webui_username' && option.key != 'webui_password'
+            +form_control(option)
         .field.is-grouped
           .control.is-expanded
             if formMessage

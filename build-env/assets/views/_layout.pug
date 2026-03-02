@@ -77,20 +77,25 @@ html.has-aside-left.has-aside-mobile-transition.has-navbar-fixed-top.has-aside-e
               a.navbar-link.is-arrowless
                 span.icon
                   i.mdi.mdi-menu
-                span Process
+                span #{web_profile.username}
                 span.icon
                   i.mdi.mdi-chevron-down
               .navbar-dropdown.is-right
-                if local
-                  a.navbar-item#open-plugins
-                    span.icon
-                      i.mdi.mdi-folder
-                    span Open Plugins Folder
-                  hr.navbar-divider
-                a.navbar-item.has-text-danger#shutdown
+                //if local
+                //  a.navbar-item#open-plugins
+                //    span.icon
+                //      i.mdi.mdi-folder
+                //    span Open Plugins Folder
+                a.navbar-item#logout
                   span.icon
-                    i.mdi.mdi-power
-                  span Shutdown CORE
+                    i.mdi.mdi-logout
+                  span Logout
+                //if admin
+                //  hr.navbar-divider
+                //  a.navbar-item.has-text-danger#shutdown
+                //    span.icon
+                //      i.mdi.mdi-power
+                //    span Shutdown CORE
       aside.aside.is-placed-left.is-expanded(data-simplebar)
         .aside-tools
           .aside-tools-label
@@ -100,7 +105,8 @@ html.has-aside-left.has-aside-mobile-transition.has-navbar-fixed-top.has-aside-e
           ul.menu-list
             +li_menu_item("desktop-mac", "Dashboard", "/")
             +li_menu_item("account-circle", "Profiles", "/profiles")
-            +li_menu_item("database", "Data Management", "/data")
+            if admin
+              +li_menu_item("database", "Data Management", "/data")
             +li_menu_item("help-circle", "About", "/about")
           p.menu-label Plugins
           ul.menu-list

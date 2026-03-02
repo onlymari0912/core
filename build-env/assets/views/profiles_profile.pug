@@ -37,6 +37,20 @@ block content
                       .field
                         .control
                           input.input#name-input(type='text' placeholder=profile.name name='name')
+                  .field.is-horizontal.is-narrow(data-tooltip="Asphyxia Login ID")
+                    .field-label.is-normal
+                      label.label Username
+                    .field-body
+                      .field
+                        .control
+                          input.input(type='text' name='username' value=profile.username)
+                  .field.is-horizontal.is-narrow(data-tooltip="Asphyxia Login password")
+                    .field-label.is-normal
+                      label.label Password
+                    .field-body
+                      .field
+                        .control
+                          input.input(type='password' name='password' autocomplete='new-password')
                   .field.is-grouped
                     .control.is-expanded
                       if formMessage
