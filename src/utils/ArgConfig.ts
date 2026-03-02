@@ -2,7 +2,7 @@ import { ArgumentParser } from 'argparse';
 import { VERSION } from './Consts';
 
 import { Logger } from './Logger';
-import { readFileSync, writeFileSync, accessSync } from 'fs';
+import { readFileSync, writeFileSync } from 'fs';
 import { parse, stringify } from 'ini';
 import path from 'path';
 
