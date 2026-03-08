@@ -129,19 +129,6 @@ function CoreConfig() {
     default: true,
   });
 
-  CONFIG_MAP['core'].set('webui_username', {
-    name: 'WebUI Username',
-    type: 'string',
-    default: 'admin',
-    desc: 'Admin username used with WebUI Password.',
-  });
-  CONFIG_MAP['core'].set('webui_password', {
-    name: 'WebUI Password',
-    type: 'password',
-    default: 'Qwer1234',
-    desc: 'Set a password to protect the WebUI.',
-  });
-
   if (process.platform == 'win32') {
     CONFIG_MAP['core'].set('webui_on_startup', {
       name: 'WebUI on startup',

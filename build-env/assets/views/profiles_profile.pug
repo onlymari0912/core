@@ -9,15 +9,15 @@ block content
             p.card-header-title
               span.icon
                 i.mdi.mdi-account
-              | Details
+              | 상세정보
           .card-content
             .columns
               .column.is-narrow
                 .image.is-64x64#profile-icon(jdenticon=profile.name jdenticon-size=64)
               .column
-                .field.is-horizontal.is-narrow
+                .field.is-horizontal.is-narrow(data-tooltip="4자리 인게임 비밀번호")
                   .field-label
-                    label.label ID
+                    label.label Ref ID
                   .field-body
                     .field
                       .control
@@ -30,23 +30,23 @@ block content
                       .field
                         .control
                           input.input(type='password' size='4' maxlength='4' placeholder='••••' name='pin')
-                  .field.is-horizontal.is-narrow(data-tooltip="Only used in WebUI")
+                  .field.is-horizontal.is-narrow(data-tooltip="웹페이지에서만 사용됩니다")
                     .field-label.is-normal
-                      label.label Name
+                      label.label 닉네임
                     .field-body
                       .field
                         .control
                           input.input#name-input(type='text' placeholder=profile.name name='name')
-                  .field.is-horizontal.is-narrow(data-tooltip="Asphyxia Login ID")
+                  .field.is-horizontal.is-narrow(data-tooltip="Asphyxia 인증 아이디")
                     .field-label.is-normal
-                      label.label Username
+                      label.label 아이디
                     .field-body
                       .field
                         .control
-                          input.input(type='text' name='username' value=profile.username)
-                  .field.is-horizontal.is-narrow(data-tooltip="Asphyxia Login password")
+                          input.input(type='text' name='username' placeholder=profile.username)
+                  .field.is-horizontal.is-narrow(data-tooltip="Asphyxia 인증 비밀번호")
                     .field-label.is-normal
-                      label.label Password
+                      label.label 비밀번호
                     .field-body
                       .field
                         .control
@@ -69,15 +69,15 @@ block content
             p.card-header-title
               span.icon
                 i.mdi.mdi-account
-              | Cards
+              | 등록된 카드 목록
           .card-content
             .field.is-horizontal.is-narrow
               .field-label.is-normal
-                label.label Add
+                label.label 추가
               .field-body
                 .field.has-addons
                   .control.is-expanded
-                    input.input#card-input(type='text' placeholder='Card Number' name='card')
+                    input.input#card-input(type='text' placeholder='카드번호 입력' name='card')
                   .control
                     button.button.is-primary#add-card
                       span.icon.is-small
@@ -86,13 +86,13 @@ block content
               .ecard.box.is-paddingless(geopattern=card.cid)
                 .ecard-brand ASPHYXIA
                 .ecard-print  
-                  .desc Card Number
+                  .desc 카드번호
                   .print #{card.print.replace(/[^a-z0-9]+/gi, '').replace(/(.{4})/g, '$1 ')}
                 .ecard-number 
                   .desc NFC
                   .print #{card.cid}
                 .ecard-logo
-                button.button.is-danger.ecard-delete(deleting=card.cid data-tooltip="Delete this card")
+                button.button.is-danger.ecard-delete(deleting=card.cid data-tooltip="카드 제거")
                   span.icon
                     i.mdi.mdi-trash-can.mdi-24px
 

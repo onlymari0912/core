@@ -395,7 +395,7 @@ export async function FindProfile(refid: string) {
   }
 }
 
-export async function CreateProfile(pin: string, gameCode: string) {
+export async function CreateProfile(pin: string, gameCode?: string) {
   if (!CONFIG.allow_register) return false;
 
   const count = await GetUniqueInt();
@@ -410,7 +410,8 @@ export async function CreateProfile(pin: string, gameCode: string) {
       __refid: refid,
       pin,
       name,
-      models: [gameCode],
+      admin: false,
+      models: gameCode ? [gameCode] : [],
     });
   } catch (err) {
     Logger.error(err);

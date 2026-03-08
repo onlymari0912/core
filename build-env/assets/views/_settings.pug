@@ -62,8 +62,7 @@ mixin form(name, options)
       form(method='post')
         input(type="hidden" name="__is_plugin" value="yes")
         each option in options
-          if option.key != 'webui_username' && option.key != 'webui_password'
-            +form_control(option)
+          +form_control(option)
         .field.is-grouped
           .control.is-expanded
             if formMessage

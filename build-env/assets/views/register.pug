@@ -1,0 +1,57 @@
+doctype html
+html
+  head
+    meta(charset="utf-8")
+    meta(http-equiv="X-UA-Compatible", content="ie=edge")
+    meta(name="viewport", content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0")
+    title Asphyxia CORE - Register
+    link(rel="stylesheet", href="/static/css/bulma.min.css")
+    link(rel="stylesheet", href="/static/css/materialdesignicons.min.css")
+    link(rel="stylesheet", href="/static/css/style.css")
+  body
+    section.section
+      .columns.is-centered
+        .column.is-5
+          .card
+            header.card-header
+              p.card-header-title
+                span.icon
+                  i.mdi.mdi-lock
+                | 회원가입
+            .card-content
+              form(method="post" action="/register")
+                input(type="hidden" name="next" value=next)
+                .field
+                  label.label(for="reg_username") 아이디
+                  .control
+                    input.input(type="text" name="username" id="reg_username" autocomplete="username" required)
+                .field
+                  label.label(for="reg_password") 비밀번호
+                  .control
+                    input.input(type="password" name="password" id="reg_password" autocomplete="new-password" required)
+                .field
+                  label.label(for="reg_confirm") 비밀번호 확인
+                  .control
+                    input.input(type="password" name="confirmPassword" id="reg_confirm" autocomplete="new-password" required)
+                .field
+                  label.label(for="reg_card") 카드 번호 (선택사항)
+                  .control
+                    input.input(type="text" name="cardNumber" id="reg_card" placeholder="16자리 카드번호")
+                if formMessage
+                  if formMessage.danger
+                    .notification.is-danger.is-light #{formMessage.message}
+                  else
+                    .notification.is-success.is-light #{formMessage.message}
+                .field.is-grouped.is-grouped-right
+                  .control
+                    button.button.is-primary(type="submit")
+                      span.icon
+                        i.mdi.mdi-account-plus
+                      span 회원가입
+              hr
+              .field.is-grouped.is-grouped-centered
+                .control
+                  a.button.is-light.is-fullwidth(href=`/login?next=${encodeURIComponent(next || '/')}`)
+                    span.icon
+                      i.mdi.mdi-arrow-left
+                    span 로그인 화면으로

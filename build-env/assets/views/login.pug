@@ -17,16 +17,16 @@ html
               p.card-header-title
                 span.icon
                   i.mdi.mdi-lock
-                | Asphyxia Login
+                | 로그인
             .card-content
               form(method="post" action="/login")
                 input(type="hidden" name="next" value=next)
                 .field
-                  label.label(for="username") Username
+                  label.label(for="username") 아이디
                   .control
                     input.input(type="text" name="username" id="username" autocomplete="username" required)
                 .field
-                  label.label(for="password") Password
+                  label.label(for="password") 비밀번호
                   .control
                     input.input(type="password" name="password" id="password" autocomplete="current-password" required)
                 if formMessage
@@ -36,4 +36,9 @@ html
                     .notification.is-success.is-light #{formMessage.message}
                 .field.is-grouped.is-grouped-right
                   .control
-                    button.button.is-link(type="submit") Login
+                    button.button.is-link(type="submit") 로그인
+              hr
+              .field.is-grouped.is-grouped-centered
+                .control
+                  a.button.is-light.is-fullwidth(href=`/register?next=${encodeURIComponent(next || '/')}`)
+                    span 회원가입

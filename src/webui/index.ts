@@ -18,28 +18,29 @@ import {
 import { get, isEmpty } from 'lodash';
 import { Converter } from 'showdown';
 import {
-  ReadAssets,
-  PLUGIN_PATH,
-  GetProfileCount,
-  GetProfiles,
-  FindCardsByRefid,
-  Count,
-  FindProfile,
-  FindProfileByUsername,
-  PurgeProfile,
-  UpdateProfile,
-  CreateCard,
-  FindCard,
-  DeleteCard,
-  APIFind,
-  APIRemove,
-  PluginStats,
-  PurgePlugin,
-  APIFindOne,
-  APIInsert,
-  APIUpdate,
-  APIUpsert,
-  APICount,
+    ReadAssets,
+    PLUGIN_PATH,
+    GetProfileCount,
+    GetProfiles,
+    FindCardsByRefid,
+    Count,
+    FindProfile,
+    FindProfileByUsername,
+    PurgeProfile,
+    UpdateProfile,
+    CreateCard,
+    FindCard,
+    DeleteCard,
+    APIFind,
+    APIRemove,
+    PluginStats,
+    PurgePlugin,
+    APIFindOne,
+    APIInsert,
+    APIUpdate,
+    APIUpsert,
+    APICount,
+    CreateProfile,
 } from '../utils/EamuseIO';
 import { urlencoded, json } from 'body-parser';
 import path from 'path';
@@ -50,7 +51,7 @@ import { groupBy, startCase, lowerCase, upperFirst } from 'lodash';
 import { sizeof } from 'sizeof';
 import { ajax as emit } from './emit';
 import { Logger } from '../utils/Logger';
-import { hashPassword, isBcryptHash, verifyPassword } from '../utils/Auth';
+import { hashPassword, isBcryptHash, verifyPassword, type WebProfile } from '../utils/Auth';
 
 const memorystore = createMemoryStore(session);
 
@@ -69,28 +70,50 @@ webui.use(cookies());
 webui.use(flash());
 let wrap = (fn: RequestHandler) => (...args: any[]) => (fn as any)(...args).catch(args[2]);
 
-function normalizeUsername(value: any) {
-  return typeof value == 'string' ? value.trim() : '';
+function normalizeUsername(value: any): string{
+    return typeof value == 'string' ? value.trim() : '';
 }
 
-function getSessionUser(req: Request) {
-  return (req as any).session?.webui_user;
+function getSessionProfile(req: Request): WebProfile{
+    return (req as any).session?.webui_user || {username: 'Unauthorized', refId: '', admin: false};
 }
 
-function isAdminSession(req: Request) {
-  return getSessionUser(req)?.admin === true;
+function hasProfileAccess(req: Request, profileOrRefId: string | WebProfile): boolean {
+    const webProfile = getSessionProfile(req);
+    if (webProfile.admin) return true;
+    if(typeof profileOrRefId == 'string'){
+        return webProfile.refId === profileOrRefId;
+    }
+    return !!profileOrRefId.public || webProfile.refId === profileOrRefId.refId;
 }
 
-function getSessionRefid(req: Request) {
-  return getSessionUser(req)?.refid as string | undefined;
-}
+function normalizeCardInput(raw: string): { cid: string; print: string } | null {
+    if(raw.length === 0){
+        return null;
+    }
 
-function hasProfileAccess(req: Request, refid: string) {
-  if (isAdminSession(req)) {
-    return true;
-  }
-  const sessionRefid = getSessionRefid(req);
-  return typeof sessionRefid == 'string' && sessionRefid.length > 0 && sessionRefid === refid;
+    try{
+        const cid = raw.toUpperCase();
+        const print = nfc2card(cid);
+        if(cardType(cid) >= 0){
+            return { cid, print };
+        }
+    }catch{
+    }
+
+    try{
+        const print = raw
+            .toUpperCase()
+            .trim()
+            .replace(/[\s\-]/g, '')
+            .replace(/O/g, '0')
+            .replace(/I/g, '1');
+        const cid = card2nfc(print);
+        if(cardType(cid) >= 0){
+            return { cid, print };
+        }
+    }catch{}
+    return null;
 }
 
 webui.get(
@@ -109,25 +132,18 @@ webui.post(
         const username = normalizeUsername(req.body?.username);
         const password = (req.body?.password ?? '').toString();
         if(username.length > 0){
-            let profile
-            if(username === CONFIG.webui_username){
-                profile = {username, password: CONFIG.webui_password};
-            }else{
-                profile = await FindProfileByUsername(username);
-            }
-
+            const profile = await FindProfileByUsername(username);
             if(profile && typeof profile.password === 'string'){
-                const ok = await verifyPassword(password, profile.password);
-                if(ok){
+                if(await verifyPassword(password, profile.password)){
                     (req as any).session.webui_authed = true;
-                    let webui_user: Record<string, string | boolean>;
-                    if(typeof profile.__refid === 'string'){
-                        webui_user = { username, refid: profile.__refid, admin: false };
-                    }else{
-                        webui_user = { username, admin: true };
-                    }
-                    (req as any).session.webui_user = webui_user;
-                    if(!webui_user.admin && !isBcryptHash(profile.password)){
+                    let webProfile: WebProfile = {
+                        username,
+                        refId: profile.__refid,
+                        admin: !!profile.admin,
+                        public: !!profile.public,
+                    };
+                    (req as any).session.webui_user = webProfile;
+                    if(!webProfile.admin && !isBcryptHash(profile.password)){
                         const hashed = await hashPassword(password);
                         await UpdateProfile(profile.__refid, { password: hashed });
                     }
@@ -144,6 +160,101 @@ webui.post(
 );
 
 webui.get(
+    '/register',
+    wrap(async (req, res) => {
+        const nextUrl =
+            typeof req.query.next == 'string' && req.query.next.startsWith('/') ? req.query.next : '/';
+        res.render('register', data(req, 'Register', 'core', { next: nextUrl }));
+    })
+);
+
+webui.post(
+    '/register',
+    urlencoded({ extended: true, limit: '1kb' }),
+    wrap(async (req, res) => {
+        const nextUrl =
+            typeof req.body.next == 'string' && req.body.next.startsWith('/') ? req.body.next : '/';
+
+        const username = normalizeUsername(req.body?.username);
+        const password = (req.body?.password ?? '').toString();
+        const confirmPassword = (req.body?.confirmPassword ?? '').toString();
+        const cardInput = req.body?.cardNumber;
+
+        if (username.length < 1) {
+            req.flash('formWarn', 'Username is required');
+            return res.redirect('/login');
+        }
+        if (password.length < 4) {
+            req.flash('formWarn', 'Password must be at least 4 characters');
+            return res.redirect('/login');
+        }
+        if (password !== confirmPassword) {
+            req.flash('formWarn', 'Password confirmation does not match');
+            return res.redirect('/login');
+        }
+
+        const existingByUsername = await FindProfileByUsername(username);
+        const cardInfo = normalizeCardInput(cardInput);
+
+        if (cardInput && typeof cardInput == 'string' && cardInput.trim().length > 0 && !cardInfo) {
+            req.flash('formWarn', 'Invalid card number format');
+            return res.redirect('/login');
+        }
+
+        const hashed = await hashPassword(password);
+
+        // 카드가 있으면 기존 카드 소유 프로필 우선
+        if (cardInfo) {
+            const existingCard = await FindCard(cardInfo.cid);
+            if (existingCard && typeof existingCard.__refid === 'string') {
+                const refId = existingCard.__refid;
+                if (existingByUsername && existingByUsername.__refid !== refId) {
+                    req.flash('formWarn', 'Username already exists');
+                    return res.redirect('/login');
+                }
+
+                const owner = await FindProfile(refId);
+                if (!owner) {
+                    req.flash('formWarn', 'Card owner profile not found');
+                    return res.redirect('/login');
+                }
+
+                await UpdateProfile(refId, { username, password: hashed });
+
+                (req as any).session.webui_authed = true;
+                (req as any).session.webui_user = { username, refId, admin: false };
+                req.flash('formOk', 'Registered and logged in');
+                return res.redirect(nextUrl);
+            }
+        }
+
+        // 새 프로필 생성
+        if (existingByUsername) {
+            req.flash('formWarn', 'Username already exists');
+            return res.redirect('/login');
+        }
+
+        const created = await CreateProfile('0000');
+        if (!created || typeof created.__refid !== 'string') {
+            req.flash('formWarn', 'Failed to create profile');
+            return res.redirect('/login');
+        }
+
+        const refId = created.__refid;
+        await UpdateProfile(refId, { username, password: hashed });
+
+        if (cardInfo) {
+            await CreateCard(cardInfo.cid, refId, cardInfo.print);
+        }
+
+        (req as any).session.webui_authed = true;
+        (req as any).session.webui_user = { username, refId, admin: created.admin };
+        req.flash('formOk', 'Registered and logged in');
+        return res.redirect(nextUrl);
+    })
+);
+
+webui.get(
     '/logout',
     wrap(async (req, res) => {
         if((req as any).session){
@@ -156,7 +267,7 @@ webui.get(
 
 webui.use(
   wrap(async (req, res, next) => {
-    if (req.path == '/login' || req.path == '/logout') {
+    if (req.path == '/login' || req.path == '/logout' || req.path == '/register') {
       return next();
     }
     if ((req as any).session?.webui_authed) {
@@ -195,12 +306,13 @@ function data(req: Request, title: string, plugin: string, attr?: any) {
     formMessage = { danger: true, message: formWarn.join(' ') };
   }
 
+  const webProfile = getSessionProfile(req);
   return {
     title,
     aside,
     plugin,
-    admin: isAdminSession(req),
-    web_profile: getSessionUser(req),
+    admin: webProfile.admin,
+    web_profile: webProfile,
     local: req.ip == '127.0.0.1' || req.ip == '::1',
     version: VERSION,
     formMessage,
@@ -313,14 +425,15 @@ webui.get(
   '/profiles',
   wrap(async (req, res) => {
     let profiles: any[] = [];
-    if (isAdminSession(req)) {
+    const webProfile = getSessionProfile(req);
+    if (webProfile.admin) {
       profiles = (await GetProfiles()) || [];
     } else {
-      const refid = getSessionRefid(req);
-      if (!refid) {
+      const refId = webProfile.refId;
+      if (!refId) {
         return res.sendStatus(403);
       }
-      const profile = await FindProfile(refid);
+      const profile = await FindProfile(refId);
       profiles = profile ? [profile] : [];
     }
     for (const profile of profiles) {
@@ -331,35 +444,30 @@ webui.get(
 );
 
 webui.delete(
-  '/profile/:refid',
-  wrap(async (req, res) => {
-    const refid = req.params['refid'];
-    if (!hasProfileAccess(req, refid)) {
-      return res.sendStatus(403);
-    }
-
-    if (await PurgeProfile(refid)) {
-      return res.sendStatus(200);
-    } else {
-      return res.sendStatus(404);
-    }
-  })
+    '/profile/:refId',
+    wrap(async (req, res) => {
+        const refId = req.params['refId'];
+        if(!hasProfileAccess(req, refId) || !(await PurgeProfile(refId))){
+            return res.sendStatus(404);
+        }
+        return res.sendStatus(200);
+    }),
 );
 
 webui.get(
-  '/profile/:refid',
+  '/profile/:refId',
   wrap(async (req, res, next) => {
-    const refid = req.params['refid'];
-    if (!hasProfileAccess(req, refid)) {
+    const refId = req.params['refId'];
+    if (!hasProfileAccess(req, refId)) {
       return res.sendStatus(403);
     }
 
-    const profile = await FindProfile(refid);
+    const profile = await FindProfile(refId);
     if (!profile) {
       return next();
     }
 
-    profile.cards = await FindCardsByRefid(refid);
+    profile.cards = await FindCardsByRefid(refId);
 
     res.render(
       'profiles_profile',
@@ -369,31 +477,32 @@ webui.get(
 );
 
 webui.delete(
-  '/card/:cid',
-  wrap(async (req, res) => {
-    const cid = req.params['cid'];
-    if (!isAdminSession(req)) {
-      const card = await FindCard(cid);
-      const refid = getSessionRefid(req);
-      if (!card || !refid || card.__refid !== refid) {
-        return res.sendStatus(403);
-      }
-    }
+    '/card/:cid',
+    wrap(async (req, res) => {
+        const cid = req.params['cid'];
+        const webProfile = getSessionProfile(req);
+        if(!webProfile.admin){
+            const card = await FindCard(cid);
+            const refId = webProfile.refId;
+            if(!card || !refId || card.__refid !== refId){
+                return res.sendStatus(403);
+            }
+        }
 
-    if (await DeleteCard(cid)) {
-      return res.sendStatus(200);
-    } else {
-      return res.sendStatus(404);
-    }
-  })
+        if(await DeleteCard(cid)){
+            return res.sendStatus(200);
+        }else{
+            return res.sendStatus(404);
+        }
+    }),
 );
 
 webui.post(
-  '/profile/:refid/card',
+  '/profile/:refId/card',
   json({ limit: '50mb' }),
   wrap(async (req, res) => {
-    const refid = req.params['refid'];
-    if (!hasProfileAccess(req, refid)) {
+    const refId = req.params['refId'];
+    if (!hasProfileAccess(req, refId)) {
       return res.sendStatus(403);
     }
     const card = req.body.cid;
@@ -403,7 +512,7 @@ webui.post(
       const print = nfc2card(cid);
 
       if (!(await FindCard(cid))) {
-        await CreateCard(cid, refid, print);
+        await CreateCard(cid, refId, print);
         return res.sendStatus(200);
       }
     } catch {}
@@ -417,7 +526,7 @@ webui.post(
         .replace(/I/g, '1');
       const cid = card2nfc(print);
       if (cardType(cid) >= 0 && !(await FindCard(cid))) {
-        await CreateCard(cid, refid, print);
+        await CreateCard(cid, refId, print);
         return res.sendStatus(200);
       }
     } catch {}
@@ -427,11 +536,11 @@ webui.post(
 );
 
 webui.post(
-  '/profile/:refid',
+  '/profile/:refId',
   urlencoded({ extended: true, limit: '50mb' }),
   wrap(async (req, res) => {
-    const refid = req.params['refid'];
-    if (!hasProfileAccess(req, refid)) {
+    const refId = req.params['refId'];
+    if (!hasProfileAccess(req, refId)) {
       return res.sendStatus(403);
     }
     const update: any = {};
@@ -445,7 +554,7 @@ webui.post(
       const nextUsername = req.body.username.toString().trim();
       if (nextUsername.length > 0) {
         const existing = await FindProfileByUsername(nextUsername);
-        if (existing && existing.__refid !== refid) {
+        if (existing && existing.__refid !== refId) {
           req.flash('formWarn', 'Username already exists');
           return res.redirect(req.originalUrl);
         }
@@ -459,7 +568,7 @@ webui.post(
       }
     }
 
-    await UpdateProfile(refid, update);
+    await UpdateProfile(refId, update);
     req.flash('formOk', 'Updated');
     res.redirect(req.originalUrl);
   })
@@ -467,15 +576,16 @@ webui.post(
 
 // Data Management
 webui.get(
-  '/data',
-  wrap(async (req, res) => {
-    const pluginStats = await PluginStats();
-    const installed = ROOT_CONTAINER.Plugins.map(p => p.Identifier);
-    res.render(
-      'data',
-      data(req, 'Data Management', 'core', { pluginStats, installed, dev: ARGS.dev })
-    );
-  })
+    '/data',
+    wrap(async (req, res) => {
+        if(!getSessionProfile(req).admin) return res.redirect('/');
+        const pluginStats = await PluginStats();
+        const installed = ROOT_CONTAINER.Plugins.map(p => p.Identifier);
+        res.render(
+            'data',
+            data(req, '데이터 관리', 'core', { pluginStats, installed, dev: ARGS.dev }),
+        );
+    }),
 );
 
 webui.get(
@@ -534,22 +644,23 @@ webui.post(
 );
 
 webui.delete(
-  '/data/:plugin',
-  wrap(async (req, res) => {
-    const pluginID = req.params['plugin'];
-    if (pluginID && pluginID.length > 0) await PurgePlugin(pluginID);
+    '/data/:plugin',
+    wrap(async (req, res) => {
+        if(!getSessionProfile(req).admin) return res.sendStatus(404);
+        const pluginID = req.params['plugin'];
+        if(pluginID && pluginID.length > 0) await PurgePlugin(pluginID);
 
-    const plugin = ROOT_CONTAINER.getPluginByID(pluginID);
-    if (plugin) {
-      // Re-register for init data
-      try {
-        plugin.Register();
-      } catch (err) {
-        Logger.error(err, { plugin: pluginID });
-      }
-    }
-    res.sendStatus(200);
-  })
+        const plugin = ROOT_CONTAINER.getPluginByID(pluginID);
+        if(plugin){
+            // Re-register for init data
+            try{
+                plugin.Register();
+            }catch(err){
+                Logger.error(err, { plugin: pluginID });
+            }
+        }
+        res.sendStatus(200);
+    }),
 );
 
 webui.get(
@@ -609,28 +720,29 @@ webui.get(
 );
 
 webui.delete(
-  '/plugin/:plugin/profile/:refid',
-  wrap(async (req, res) => {
-    const plugin = ROOT_CONTAINER.getPluginByID(req.params['plugin']);
+    '/plugin/:plugin/profile/:refId',
+    wrap(async (req, res) => {
+        if(!getSessionProfile(req).admin) return res.sendStatus(404);
 
-    if (!plugin) {
-      return res.sendStatus(404);
-    }
+        const plugin = ROOT_CONTAINER.getPluginByID(req.params['plugin']);
+        if(!plugin){
+            return res.sendStatus(404);
+        }
 
-    const refid = req.params['refid'];
-    if (!refid || refid.length < 0) {
-      return res.sendStatus(400);
-    }
-    if (!hasProfileAccess(req, refid)) {
-      return res.sendStatus(403);
-    }
+        const refId = req.params['refId'];
+        if(!refId || refId.length < 0){
+            return res.sendStatus(400);
+        }
+        if(!hasProfileAccess(req, refId)){
+            return res.sendStatus(403);
+        }
 
-    if (await APIRemove({ identifier: plugin.Identifier, core: true }, refid, {})) {
-      return res.sendStatus(200);
-    } else {
-      return res.sendStatus(404);
-    }
-  })
+        if(await APIRemove({ identifier: plugin.Identifier, core: true }, refId, {})){
+            return res.sendStatus(200);
+        }else{
+            return res.sendStatus(404);
+        }
+    }),
 );
 
 // Plugin statics
@@ -661,59 +773,59 @@ webui.get(
 
 // Plugin Profiles
 webui.get(
-  '/plugin/:plugin/profiles',
-  wrap(async (req, res, next) => {
-    const plugin = ROOT_CONTAINER.getPluginByID(req.params['plugin']);
-
-    if (!plugin) {
-      return next();
-    }
-
-    let profileDocs: any[] = [];
-    if (isAdminSession(req)) {
-      profileDocs = await APIFind({ identifier: plugin.Identifier, core: true }, null, {});
-    } else {
-      const refid = getSessionRefid(req);
-      if (!refid) {
-        return res.sendStatus(403);
-      }
-      profileDocs = await APIFind({ identifier: plugin.Identifier, core: true }, refid, {});
-    }
-
-    const profiles = groupBy(profileDocs, '__refid');
-
-    const profileData: any[] = [];
-    for (const refid in profiles) {
-      let name = undefined;
-      for (const doc of profiles[refid]) {
-        if (doc.__refid == null) {
-          PurgeProfile(doc.__refid);
-          break;
+    '/plugin/:plugin/profiles',
+    wrap(async (req, res, next) => {
+        const plugin = ROOT_CONTAINER.getPluginByID(req.params['plugin']);
+        if(!plugin){
+            return next();
         }
-        if (typeof doc.name == 'string') {
-          name = doc.name;
-          break;
+
+        let profileDocs: any[] = [];
+        const webProfile = getSessionProfile(req);
+        if(webProfile.admin){
+            profileDocs = await APIFind({ identifier: plugin.Identifier, core: true }, null, {});
+        }else{
+            const refId = webProfile.refId;
+            if(!refId){
+                return res.sendStatus(403);
+            }
+            profileDocs = await APIFind({ identifier: plugin.Identifier, core: true }, refId, {});
         }
-      }
 
-      profileData.push({
-        refid,
-        name,
-        dataSize: sizeof(profiles[refid], true),
-        coreProfile: await FindProfile(refid),
-      });
-    }
+        const profiles = groupBy(profileDocs, '__refid');
 
-    res.render(
-      'plugin_profiles',
-      data(req, plugin.Name, plugin.Identifier, {
-        subtitle: 'Profiles',
-        subidentifier: 'profiles',
-        hasCustomPage: plugin.FirstProfilePage != null,
-        profiles: profileData,
-      })
-    );
-  })
+        const profileData: any[] = [];
+        for(const refId in profiles){
+            let name = undefined;
+            for(const doc of profiles[refId]){
+                if(doc.__refid == null){
+                    PurgeProfile(doc.__refid);
+                    break;
+                }
+                if(typeof doc.name == 'string'){
+                    name = doc.name;
+                    break;
+                }
+            }
+
+            profileData.push({
+                refid: refId,
+                name,
+                dataSize: sizeof(profiles[refId], true),
+                coreProfile: await FindProfile(refId),
+            });
+        }
+
+        res.render(
+            'plugin_profiles',
+            data(req, plugin.Name, plugin.Identifier, {
+                subtitle: 'Profiles',
+                subidentifier: 'profiles',
+                hasCustomPage: plugin.FirstProfilePage != null,
+                profiles: profileData,
+            }),
+        );
+    }),
 );
 
 // Plugin Profile Page
@@ -726,19 +838,19 @@ webui.get(
       return next();
     }
 
-    const refid = req.query['refid'];
+    const refId = req.query['refid'];
 
-    if (refid == null) {
+    if (refId == null) {
       return next();
     }
-    if (!hasProfileAccess(req, refid.toString())) {
+    if (!hasProfileAccess(req, refId.toString())) {
       return res.sendStatus(403);
     }
 
     const pageName = req.query['page'];
     const page = pageName == null ? plugin.FirstProfilePage : `profile_${pageName.toString()}`;
 
-    const content = await plugin.render(page, { query: req.query }, refid.toString());
+    const content = await plugin.render(page, { query: req.query }, refId.toString());
     if (content == null) {
       return next();
     }
@@ -757,7 +869,7 @@ webui.get(
         subidentifier: 'profiles',
         subsubtitle: startCase(page.substr(8)),
         subsubidentifier: page.substr(8),
-        refid: refid.toString(),
+        refid: refId.toString(),
       })
     );
   })
@@ -815,7 +927,7 @@ webui.post(
             return;
         }
 
-        if(page || !isAdminSession(req)){
+        if(page || !getSessionProfile(req).admin){
             // Custom page form or not admin
         }else{
             const configMap = CONFIG_MAP[plugin];

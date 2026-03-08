@@ -18,9 +18,11 @@ block content
               thead
                 tr
                   th
-                  th Name
-                  th.is-hidden-mobile ID
-                  th Cards
+                  th 닉네임
+                  if admin
+                    th.is-hidden-mobile 아이디
+                    th.is-hidden-mobile Ref ID
+                  th 등록된 카드
                   th
               tbody
                 each profile, index in profiles
@@ -28,7 +30,9 @@ block content
                     td.is-image-cell
                       .image.is-32x32(jdenticon=profile.name jdenticon-size='32')
                     td.has-padding-top-7 #{profile.name}
-                    td.is-hidden-mobile.has-padding-top-7 #{profile.__refid}
+                    if admin
+                      td.is-hidden-mobile.has-padding-top-7 #{profile.username}
+                      td.is-hidden-mobile.has-padding-top-7 #{profile.__refid}
                     td.has-padding-top-7 #{profile.cards}
                     td.has-padding-right-5
                       .buttons.is-right.are-small
@@ -46,10 +50,13 @@ block content
                 span.icon.is-large
                   i.mdi.mdi-emoticon-happy.mdi-48px
               p Nothing's here yet. Let's play!
-              
+
 block modal
-  +confirm("Deleting profile", "/profile/")
-    p
-      b Are you sure?
-    p Deleting the profile will delete all game data associated with this profile (including scores).
-    p You will not be able to undo this action.
+  if admin
+    +confirm("Deleting profile", "/profile/")
+      p
+        b Are you sure?
+      p Deleting the profile will delete all game data associated with this profile (including scores).
+      p You will not be able to undo this action.
+  else
+    p Not enough minerals
