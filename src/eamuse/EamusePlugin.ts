@@ -5,11 +5,11 @@ import { isNil } from 'lodash';
 import { Logger } from '../utils/Logger';
 import { PLUGIN_PATH, APIFindOne, APIFind } from '../utils/EamuseIO';
 import path from 'path';
-import { readdirSync, readFileSync } from 'fs';
+import { readdirSync, readFileSync, statSync } from 'fs';
 import { FindCard, CreateProfile, CreateCard, BindProfile } from '../utils/EamuseIO';
 
 import { compile } from 'pug';
-import { CONFIG } from '../utils/ArgConfig';
+import { ARGS, CONFIG } from '../utils/ArgConfig';
 import { nfc2card } from '../utils/CardCipher';
 
 async function cardSanitizer(gameCode: string, str: string, refMap: any): Promise<string> {
@@ -114,6 +114,7 @@ export class EamusePlugin {
   };
   private uiCache: {
     [file: string]: {
+      mtimeMs: number;
       props: { [field: string]: string };
       fn: (local: any) => string;
     };
@@ -180,40 +181,51 @@ export class EamusePlugin {
     }
   }
 
+  private CompilePage(page: string) {
+    const filePath = path.join(PLUGIN_PATH, this.pluginIdentifier, 'webui', `${page}.pug`);
+    const cached = this.uiCache[page];
+
+    try {
+      const mtimeMs = statSync(filePath).mtimeMs;
+      if (cached && cached.mtimeMs === mtimeMs) {
+        return;
+      }
+
+      const template = readFileSync(filePath, { encoding: 'utf8' });
+
+      const dataBlock = template.match(
+        /^\/\/DATA\/\/\s*$[\n|\r|\n\r]((?:^\s+[_a-z]\w*:\s*.+$[\n|\r|\n\r]?)+)/m
+      );
+
+      const fn = compile(template);
+      const props: { [field: string]: string } = {};
+
+      const lines = dataBlock ? dataBlock[1].split('\n') : [];
+      for (const line of lines) {
+        const parts = line.trim().match(/([_a-z]\w*):\s*(.*)/);
+        if (parts) {
+          const field = parts[1];
+          const expression = parts[2].endsWith(',')
+            ? parts[2].slice(0, parts.length - 1)
+            : parts[2];
+
+          this.ExpressionCheck(page.startsWith('profile_'), expression);
+          props[field] = expression;
+        }
+      }
+
+      this.uiCache[page] = { mtimeMs, props, fn };
+    } catch (err) {
+      Logger.error(`Can not compile WebUI file "${page}.pug":`, {
+        plugin: this.pluginIdentifier,
+      });
+      Logger.error(err, { plugin: this.pluginIdentifier });
+    }
+  }
+
   private CompilePages() {
     for (const page of this.uiPages.concat(this.uiProfiles)) {
-      const filePath = path.join(PLUGIN_PATH, this.pluginIdentifier, 'webui', `${page}.pug`);
-      try {
-        const template = readFileSync(filePath, { encoding: 'utf8' });
-
-        const dataBlock = template.match(
-          /^\/\/DATA\/\/\s*$[\n|\r|\n\r]((?:^\s+[_a-z]\w*:\s*.+$[\n|\r|\n\r]?)+)/m
-        );
-
-        const fn = compile(template);
-        const props: { [field: string]: string } = {};
-
-        const lines = dataBlock ? dataBlock[1].split('\n') : [];
-        for (const line of lines) {
-          const parts = line.trim().match(/([_a-z]\w*):\s*(.*)/);
-          if (parts) {
-            const field = parts[1];
-            const expression = parts[2].endsWith(',')
-              ? parts[2].slice(0, parts.length - 1)
-              : parts[2];
-
-            this.ExpressionCheck(page.startsWith('profile_'), expression);
-            props[field] = expression;
-          }
-        }
-
-        this.uiCache[page] = { props, fn };
-      } catch (err) {
-        Logger.error(`Can not compile WebUI file "${page}.pug":`, {
-          plugin: this.pluginIdentifier,
-        });
-        Logger.error(err, { plugin: this.pluginIdentifier });
-      }
+      this.CompilePage(page);
     }
   }
 
@@ -265,6 +277,10 @@ export class EamusePlugin {
   }
 
   public async render(page: string, data: any, refid?: string) {
+    if (ARGS.dev) {
+      this.CompilePage(page);
+    }
+
     const cache = this.uiCache[page];
     if (!cache) return null;
 

@@ -15,9 +15,21 @@ import prettyBytes from 'pretty-bytes';
 
 const pkg: boolean = (process as any).pkg;
 const EXEC_PATH = path.resolve(pkg ? path.dirname(process.argv0) : process.cwd());
+const PROJECT_PATH = path.resolve(__dirname, '..', '..');
 
-export const PLUGIN_PATH = path.join(EXEC_PATH, 'plugins');
-export const ASSETS_PATH = path.join(pkg ? __dirname : `../build-env`, 'assets');
+const PLUGIN_PATH_OVERRIDE = process.env.ASPHYXIA_PLUGIN_PATH;
+const ASSETS_PATH_OVERRIDE = process.env.ASPHYXIA_ASSETS_PATH;
+
+export const PLUGIN_PATH = path.resolve(
+  PLUGIN_PATH_OVERRIDE ? PLUGIN_PATH_OVERRIDE : path.join(EXEC_PATH, 'plugins')
+);
+export const ASSETS_PATH = path.resolve(
+  ASSETS_PATH_OVERRIDE
+    ? ASSETS_PATH_OVERRIDE
+    : pkg
+    ? path.join(__dirname, 'assets')
+    : path.join(PROJECT_PATH, 'build-env', 'assets')
+);
 
 const SAVE_PATH = path.resolve(EXEC_PATH, ARGS.savedata);
 const COREDB_FILE = path.join(SAVE_PATH, 'core.db');
