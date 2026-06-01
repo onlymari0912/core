@@ -37,6 +37,28 @@ export interface EamuseInfo {
   model: string;
 }
 
+function forwardedHeader(req: any, name: string) {
+  const value = req.headers?.[name];
+  if (typeof value !== 'string') {
+    return '';
+  }
+  return value.split(',')[0].trim();
+}
+
+function stripPort(host: string) {
+  if (!host) {
+    return host;
+  }
+
+  if (host.startsWith('[')) {
+    const end = host.indexOf(']');
+    return end >= 0 ? host.slice(1, end) : host;
+  }
+
+  const colonIndex = host.lastIndexOf(':');
+  return colonIndex > 0 ? host.slice(0, colonIndex) : host;
+}
+
 export const EamuseMiddleware: RequestHandler = async (req, res, next) => {
   res.set('X-Powered-By', 'Asphyxia');
 
@@ -166,12 +188,21 @@ export const EamuseRoute = (router: EamuseRootRouter): RequestHandler => {
 
     // HACK: give facility ip
     if (body.module == 'facility' && body.method == 'get') {
-      (info as any).ip = req.ip.includes(':') ? '127.0.0.1' : req.ip;
+      const forwardedFor = forwardedHeader(req, 'x-forwarded-for');
+      const clientIp = forwardedFor || req.ip;
+      (info as any).ip = clientIp.includes(':') ? '127.0.0.1' : clientIp;
     }
 
     // HACK: give services host
     if (body.module == 'services' && body.method == 'get') {
-      (info as any).host = req.hostname;
+      const forwardedHost = forwardedHeader(req, 'x-forwarded-host');
+      const forwardedProto = forwardedHeader(req, 'x-forwarded-proto');
+
+      (info as any).host = forwardedHost
+        ? stripPort(forwardedHost)
+        : req.get('host') || req.hostname;
+      (info as any).protocol = forwardedProto || req.protocol;
+      (info as any).proxy = Boolean(forwardedHost || forwardedProto);
     }
 
     try {
