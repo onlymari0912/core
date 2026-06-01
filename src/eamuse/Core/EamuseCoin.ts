@@ -34,3 +34,13 @@ eacoin.add('eacoin.consume', async (info, data, send) => {
   send.object(result);
   return;
 });
+
+eacoin.add('eacoin.getbalance', async (info, data, send) => {
+  const result = {};
+
+  set(result, 'acstatus', kitem('u8', 0));
+  set(result, 'balance', kitem('s32', 88410));
+
+  send.object(result);
+  return;
+});
