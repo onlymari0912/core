@@ -326,6 +326,20 @@ declare namespace R {
   function Route(method: string, handler: EamusePluginRoute | boolean): void;
 
   /**
+   * Register a route that runs before CORE's built-in route.
+   *
+   * You should only call this from your plugin's `register()` function.
+   *
+   * @param method    Method name of your target route,
+   *                  usually looks like `"module.get"`
+   * @param handler   Your custom route function/method following the type [[EamusePluginRoute]].
+   *                  A boolean can be passed if you don't need any processing:
+   *                    - `true`: Sending empty response with status code 0
+   *                    - `false`: Sending empty response with status code 1
+   */
+  function CoreRoute(method: string, handler: EamusePluginRoute | boolean): void;
+
+  /**
    * Register all unhandled routes for a game.
    *
    * You should only call this from your plugin's `register()` function.

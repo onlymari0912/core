@@ -52,11 +52,11 @@ export class EamuseRootRouter {
     data: any,
     send: EamuseSend
   ) {
+    const plugin = this.pluginMap[gameCode];
+
+    if (plugin && (await plugin.runCore(moduleName, method, info, data, send))) return;
     if (await this.core.run(moduleName, method, info, data, send)) return;
-    if (
-      this.pluginMap[gameCode] &&
-      (await this.pluginMap[gameCode].run(moduleName, method, info, data, send))
-    )
+    if (plugin && (await plugin.run(moduleName, method, info, data, send)))
       return;
 
     send.deny();

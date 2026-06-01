@@ -94,12 +94,17 @@ export type WebUISend = {
 };
 export type WebUIEventHandler = (data: any, send: WebUISend) => Promise<void>;
 
+type RegisteredRouteHandler = boolean | EamuseRouteHandler;
+
 export class EamusePlugin {
   private pluginName: string;
   private pluginIdentifier: string;
   private gameCodes: string[];
   private routes: {
-    [method: string]: boolean | EamuseRouteHandler;
+    [method: string]: RegisteredRouteHandler;
+  };
+  private coreRoutes: {
+    [method: string]: RegisteredRouteHandler;
   };
   private unhandled: boolean | EamuseRouteHandler;
   private contributors: {
@@ -128,6 +133,7 @@ export class EamusePlugin {
     this.pluginIdentifier = folderName;
     this.gameCodes = [];
     this.routes = {};
+    this.coreRoutes = {};
     this.unhandled = false;
     this.contributors = [];
 
@@ -241,6 +247,10 @@ export class EamusePlugin {
     this.routes[method] = route;
   }
 
+  public RegisterCoreRoute(method: string, route?: boolean | EamuseRouteHandler) {
+    this.coreRoutes[method] = route;
+  }
+
   public RegisterWebUIEvent(event: string, callback: WebUIEventHandler) {
     this.uiEvents[event] = callback;
   }
@@ -259,6 +269,26 @@ export class EamusePlugin {
     } else {
       this.unhandled = true;
     }
+  }
+
+  private async executeHandler(
+    handler: RegisteredRouteHandler,
+    info: EamuseInfo,
+    data: any,
+    send: EamuseSend
+  ) {
+    const sanitized = await sanitization(info.gameCode, data);
+    if (sanitized == null) {
+      return false;
+    }
+
+    if (typeof handler === 'boolean') {
+      handler ? send.success() : send.deny();
+      return true;
+    }
+
+    await handler(info, sanitized, send);
+    return true;
   }
 
   public get Pages() {
@@ -321,13 +351,13 @@ export class EamusePlugin {
   ): Promise<boolean> {
     let handler = this.routes[`${moduleName}.${method}`];
 
-    const sanitized = await sanitization(info.gameCode, data);
-    if (sanitized == null) {
-      return false;
-    }
-
     if (isNil(handler)) {
       if (this.unhandled) {
+        const sanitized = await sanitization(info.gameCode, data);
+        if (sanitized == null) {
+          return false;
+        }
+
         if (typeof this.unhandled == 'function') {
           this.unhandled(info, sanitized, send);
         } else {
@@ -342,19 +372,32 @@ export class EamusePlugin {
       }
     }
 
-    if (typeof handler === 'boolean') {
-      handler ? send.success() : send.deny();
-      return true;
-    }
-
     try {
-      await handler(info, sanitized, send);
+      return await this.executeHandler(handler, info, data, send);
     } catch (err) {
       Logger.error(err, { plugin: this.pluginIdentifier });
       return false;
     }
+  }
 
-    return true;
+  public async runCore(
+    moduleName: string,
+    method: string,
+    info: EamuseInfo,
+    data: any,
+    send: EamuseSend
+  ): Promise<boolean> {
+    const handler = this.coreRoutes[`${moduleName}.${method}`];
+    if (isNil(handler)) {
+      return false;
+    }
+
+    try {
+      return await this.executeHandler(handler, info, data, send);
+    } catch (err) {
+      Logger.error(err, { plugin: this.pluginIdentifier });
+      return false;
+    }
   }
 
   public get GameCodes() {

@@ -198,6 +198,7 @@ export function LoadExternalPlugins() {
   $.R = {
     GameCode: () => {},
     Route: () => {},
+    CoreRoute: () => {},
     Unhandled: () => {},
     Contributor: () => {},
     Config: () => {},
@@ -214,6 +215,9 @@ export function LoadExternalPlugins() {
     };
     $.R.Route = (method: string, handler?: boolean | EamuseRouteHandler) => {
       plugin.RegisterRoute(method, handler);
+    };
+    $.R.CoreRoute = (method: string, handler?: boolean | EamuseRouteHandler) => {
+      plugin.RegisterCoreRoute(method, handler);
     };
     $.R.Unhandled = (handler?: EamuseRouteHandler) => {
       plugin.RegisterUnhandled(handler);
@@ -238,6 +242,7 @@ export function LoadExternalPlugins() {
   function DisableRegisterNamespace() {
     $.R.GameCode = () => {};
     $.R.Route = () => {};
+    $.R.CoreRoute = () => {};
     $.R.Unhandled = () => {};
     $.R.Contributor = () => {};
     $.R.Config = () => {};
