@@ -56,6 +56,7 @@ cardmng.add('cardmng.inquire', async (info, data, send) => {
       ecflag: 1,
       expired: 0,
       newflag: 0,
+      pcode: card.__refid,
       refid: card.__refid,
     },
   });
