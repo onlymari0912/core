@@ -129,6 +129,13 @@ function CoreConfig() {
     default: true,
   });
 
+  CONFIG_MAP['core'].set('http_trace_logging', {
+    name: 'HTTP Trace Logging',
+    type: 'boolean',
+    default: false,
+    desc: 'Write request and response XML traces to logs/http_trace.',
+  });
+
   if (process.platform == 'win32') {
     CONFIG_MAP['core'].set('webui_on_startup', {
       name: 'WebUI on startup',

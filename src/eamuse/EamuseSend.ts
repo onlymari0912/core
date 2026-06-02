@@ -13,6 +13,7 @@ import { EABody } from '../middlewares/EamuseMiddleware';
 import chalk from 'chalk';
 import { readFileSync } from 'fs';
 import { GetCallerPlugin } from './ExternalPluginLoader';
+import { appendHttpTrace } from '../utils/HttpTrace';
 
 export interface EamuseSendOption {
   status?: number;
@@ -76,6 +77,11 @@ export class EamuseSend {
     const result = { response: {} };
     content['@attr'] = { ...content['@attr'], status };
     set(result, `response.${rootName}`, content);
+    appendHttpTrace(
+      'response',
+      `${this.body.module}.${this.body.method}`,
+      result
+    );
 
     let data = null;
 

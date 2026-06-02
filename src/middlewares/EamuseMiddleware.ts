@@ -15,6 +15,7 @@ import { Logger } from '../utils/Logger';
 import { EamuseSend } from '../eamuse/EamuseSend';
 import { dataToXML } from '../utils/KBinJSON';
 import { EamuseRootRouter } from '../eamuse/EamuseRootRouter';
+import { appendHttpTrace } from '../utils/HttpTrace';
 
 // const ACCEPT_AGENTS = ['EAMUSE.XRPC/1.0', 'EAMUSE.Httpac/1.0'];
 
@@ -167,6 +168,7 @@ export const EamuseMiddleware: RequestHandler = async (req, res, next) => {
       kencoded,
       model,
     } as EABody;
+    appendHttpTrace('request', `${eaModule}.${eaMethod}`, xml);
     next();
   });
 };
