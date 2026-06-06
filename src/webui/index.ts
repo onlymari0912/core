@@ -942,12 +942,12 @@ webui.post(
             let needRestart = false;
             for(const [key, config] of configMap){
                 let newValue = req.body[key];
-                if(newValue == null) continue;
 
                 const beforeValue = configData[key];
                 if(config.type === 'boolean'){
-                    configData[key] = !!newValue;
+                    configData[key] = newValue != null;
                 }else if(config.type === 'float'){
+                    if(newValue == null) continue;
                     newValue = parseFloat(newValue);
                     if(!Number.isFinite(newValue)){
                         errorMessage = `'${key}' 옵션은 실수만 입력 가능합니다.`;
@@ -955,6 +955,7 @@ webui.post(
                     }
                     configData[key] = newValue;
                 }else if(config.type === 'integer'){
+                    if(newValue == null) continue;
                     newValue = parseInt(newValue);
                     if(!Number.isFinite(newValue)){
                         errorMessage = `'${key}' 옵션은 정수만 입력 가능합니다.`;
@@ -962,8 +963,10 @@ webui.post(
                     }
                     configData[key] = newValue;
                 }else if(config.type === 'string'){
+                    if(newValue == null) continue;
                     configData[key] = newValue;
                 }else if(config.type === 'password'){
+                    if(newValue == null) continue;
                     if(newValue.length > 3){
                         configData[key] = await hashPassword(newValue);
                     }else{
