@@ -43,6 +43,13 @@ parser.addArgument(['--dev', '--console'], {
   action: 'storeTrue',
 });
 
+parser.addArgument(['--reload-pug'], {
+  help: 'Always recompile the plugin WebUI Pug file',
+  defaultValue: false,
+  dest: 'reload_pug',
+  action: 'storeTrue',
+});
+
 parser.addArgument(['-pa', '--ping-addr'], {
   help: 'Use an ICMP pingable target to make your games think they are online',
   metavar: 'IP',

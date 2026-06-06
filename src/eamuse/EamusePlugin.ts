@@ -307,7 +307,7 @@ export class EamusePlugin {
   }
 
   public async render(page: string, data: any, refid?: string) {
-    if (ARGS.dev) {
+    if (ARGS.dev || ARGS.reload_pug) {
       this.CompilePage(page);
     }
 
