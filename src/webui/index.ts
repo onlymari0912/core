@@ -815,9 +815,6 @@ webui.get(
                 coreProfile: await FindProfile(refId),
             });
         }
-        if(profileData.length === 1){
-            return res.redirect(`/plugin/${plugin.Identifier}/profile?refid=${profileData[0].refid}`);
-        }
 
         res.render(
             'plugin_profiles',
