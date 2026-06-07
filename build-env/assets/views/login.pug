@@ -8,37 +8,35 @@ html
     link(rel="stylesheet", href="/static/css/bulma.min.css")
     link(rel="stylesheet", href="/static/css/materialdesignicons.min.css")
     link(rel="stylesheet", href="/static/css/style.css")
-  body
-    section.section
-      .columns.is-centered
-        .column.is-5
-          .card
-            header.card-header
-              p.card-header-title
-                span.icon
-                  i.mdi.mdi-lock
-                | 로그인
-            .card-content
-              form(method="post" action="/login")
-                input(type="hidden" name="next" value=next)
-                .field
-                  label.label(for="username") 아이디
-                  .control
-                    input.input(type="text" name="username" id="username" autocomplete="username" required)
-                .field
-                  label.label(for="password") 비밀번호
-                  .control
-                    input.input(type="password" name="password" id="password" autocomplete="current-password" required)
-                if formMessage
-                  if formMessage.danger
-                    .notification.is-danger.is-light #{formMessage.message}
-                  else
-                    .notification.is-success.is-light #{formMessage.message}
-                .field.is-grouped.is-grouped-right
-                  .control
-                    button.button.is-link(type="submit") 로그인
-              hr
-              .field.is-grouped.is-grouped-centered
-                .control
-                  a.button.is-light.is-fullwidth(href=`/register?next=${encodeURIComponent(next || '/')}`)
-                    span 회원가입
+  body.auth-page
+    main.auth-shell
+      .card.auth-card
+        header.card-header
+          p.card-header-title
+            span.icon
+              i.mdi.mdi-lock
+            | 로그인
+        .card-content
+          form(method="post" action="/login")
+            input(type="hidden" name="next" value=next)
+            .field
+              label.label(for="username") 아이디
+              .control
+                input.input(type="text" name="username" id="username" autocomplete="username" required)
+            .field
+              label.label(for="password") 비밀번호
+              .control
+                input.input(type="password" name="password" id="password" autocomplete="current-password" required)
+            if formMessage
+              if formMessage.danger
+                .notification.is-danger.is-light #{formMessage.message}
+              else
+                .notification.is-success.is-light #{formMessage.message}
+            .field.is-grouped.is-grouped-right
+              .control
+                button.button.is-link(type="submit") 로그인
+          hr
+          .field.is-grouped.is-grouped-centered
+            .control
+              a.button.is-light.is-fullwidth(href=`/register?next=${encodeURIComponent(next || '/')}`)
+                span 회원가입

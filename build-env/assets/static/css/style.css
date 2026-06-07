@@ -6,6 +6,30 @@ html {
   overflow-y: hidden;
 }
 
+body.auth-page {
+  align-items: center;
+  background: #f3f6f8;
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 1.5rem;
+}
+
+.auth-shell {
+  width: 100%;
+  max-width: 420px;
+}
+
+.auth-card {
+  border-radius: 6px;
+  box-shadow: 0 12px 32px rgba(10, 10, 10, 0.12);
+  overflow: hidden;
+}
+
+.auth-card .card-header-title {
+  justify-content: center;
+}
+
 aside {
   overflow-y: auto;
   overflow-x: hidden;
