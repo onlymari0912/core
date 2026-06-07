@@ -1,0 +1,26 @@
+doctype html
+html
+  head
+    meta(charset="utf-8")
+    meta(http-equiv="X-UA-Compatible", content="ie=edge")
+    meta(name="viewport", content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0")
+    title Asphyxia CORE - HTTPS 필요
+    link(rel="stylesheet", href="/static/css/bulma.min.css")
+    link(rel="stylesheet", href="/static/css/materialdesignicons.min.css")
+    link(rel="stylesheet", href="/static/css/style.css")
+    script(type="text/javascript" src="/static/js/jquery-3.5.1.min.js")
+    script(type="text/javascript" src="/static/js/jdenticon-2.2.0.min.js")
+    script(type="text/javascript" src="/static/js/geopattern.min.js")
+    script(type="text/javascript" src="/static/js/js.cookie-2.2.1.min.js")
+  body.auth-page
+    main.auth-shell.is-error-page
+      section.hero.is-dark.auth-card(geopattern)
+        .hero-body
+          .columns
+            .column.is-narrow
+              .image.is-128x128(style="background-color: #ffffffaa" jdenticon jdenticon-size=128)
+            .column
+              h1.title Error: 잘못된 접근입니다.
+              p.subtitle 웹 접근은 HTTPS 요청만 허용됩니다.
+              p.has-text-right.is-size-7 해당 페이지는 보안 연결이 필요합니다.
+      script(type="text/javascript" src="/static/js/main.js")

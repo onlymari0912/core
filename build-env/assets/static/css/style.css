@@ -20,6 +20,10 @@ body.auth-page {
   max-width: 420px;
 }
 
+.auth-shell.is-error-page {
+  max-width: 720px;
+}
+
 .auth-card {
   border-radius: 6px;
   box-shadow: 0 12px 32px rgba(10, 10, 10, 0.12);

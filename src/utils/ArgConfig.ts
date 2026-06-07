@@ -143,6 +143,13 @@ function CoreConfig() {
     desc: 'Write request and response XML traces to logs/http_trace.',
   });
 
+  CONFIG_MAP['core'].set('webui_require_https', {
+    name: 'Require HTTPS for WebUI',
+    type: 'boolean',
+    default: false,
+    desc: 'Block WebUI requests over HTTP and show an HTTPS connection notice.',
+  });
+
   if (process.platform == 'win32') {
     CONFIG_MAP['core'].set('webui_on_startup', {
       name: 'WebUI on startup',

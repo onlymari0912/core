@@ -87,6 +87,17 @@ function hasProfileAccess(req: Request, profileOrRefId: string | WebProfile): bo
     return !!profileOrRefId.public || webProfile.refId === profileOrRefId.refId;
 }
 
+function isSecureWebUIRequest(req: Request): boolean {
+    if (req.secure) return true;
+
+    const forwardedProto = req.headers['x-forwarded-proto'];
+    if (typeof forwardedProto == 'string') {
+        return forwardedProto.split(',')[0].trim().toLowerCase() == 'https';
+    }
+
+    return false;
+}
+
 function normalizeCardInput(raw: string): { cid: string; print: string } | null {
     if(raw.length === 0){
         return null;
@@ -115,6 +126,18 @@ function normalizeCardInput(raw: string): { cid: string; print: string } | null 
     }catch{}
     return null;
 }
+
+webui.use(
+    wrap(async (req, res, next) => {
+        if (!CONFIG.webui_require_https || isSecureWebUIRequest(req)) {
+            return next();
+        }
+
+        res.status(403).render('https_required', data(req, 'HTTPS 필요', 'core', {
+            requestedUrl: req.originalUrl || '/',
+        }));
+    })
+);
 
 webui.get(
   '/login',
